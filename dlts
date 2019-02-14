@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import subprocess
+import nltk
+import string
+from nltk.collocations import *
+from youtube_transcript_api import YouTubeTranscriptApi
+
+# Downloads YouTube Video to directory this was called from
+dirName = "tmp"
+ogContents = []
+
+if (not(os.path.exists(dirName))):
+        os.makedirs(dirName)
+        ogContents = os.listdir(dirName)
+
+
+codes = sys.argv[1:]
+
+fp = codes[0] + ".txt"
+if not os.path.isfile(fp):
+    transcripts = ""
+    for code in codes:
+        print("DL: " + code)
+        try:
+            fragments = YouTubeTranscriptApi.get_transcript(code)
+            for frag in fragments:
+                transcripts = transcripts + " " + frag['text']
+        except:
+            print("FAILED: " + code)
+    text_file = open(fp , "w")
+    text_file.write(transcripts)
+    text_file.close
+
+transcripts = open(fp).read()
+
+translator = str.maketrans('', '', string.punctuation)
+transcripts = transcripts.translate(translator)
+
+tokens = nltk.word_tokenize(transcripts)
+
+filter_these = ()
+tokens = [word.lower() for word in tokens if word.lower() not in filter_these]
+
+bigram_measures = nltk.collocations.BigramAssocMeasures()
+trigram_measures = nltk.collocations.TrigramAssocMeasures()
+
+# change this to read in your data
+finder = TrigramCollocationFinder.from_words(tokens)
+# finder = BigramCollocationFinder.from_words(tokens)
+
+# only bigrams that appear 3+ times
+finder.apply_freq_filter(3) 
+
+# return the 10 n-grams with the highest PMI
+print(finder.nbest(bigram_measures.pmi, 100))
+
