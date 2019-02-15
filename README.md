@@ -1,4 +1,4 @@
-# Untitled Transcript NLP Project
+# DownLoad TranScript (DLTS) Natural Language Processing Project
 
 This tool leverages a YouTube Transcript Downloader tool and prototypes some linguistic analysis.
 
