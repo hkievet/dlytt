@@ -6,9 +6,6 @@ import sys
 import nltk
 from youtube_transcript_api import YouTubeTranscriptApi
 
-# Downloads YouTube Video to directory this was called from
-
-
 def get_transcript_text(youtube_hashes):
     '''
     Gathers transcripts for a list of videos and removes punctuation
