@@ -1,59 +1,97 @@
 #!/usr/bin/env python3
-
-import sys
 import os
-import subprocess
-import nltk
 import string
-from nltk.collocations import *
+import sys
+
+import nltk
 from youtube_transcript_api import YouTubeTranscriptApi
 
 # Downloads YouTube Video to directory this was called from
-dirName = "tmp"
-ogContents = []
-
-if (not(os.path.exists(dirName))):
-        os.makedirs(dirName)
-        ogContents = os.listdir(dirName)
 
 
-codes = sys.argv[1:]
-
-fp = codes[0] + ".txt"
-if not os.path.isfile(fp):
-    transcripts = ""
-    for code in codes:
-        print("DL: " + code)
+def get_transcript_text(youtube_hashes):
+    '''
+    Gathers transcripts for a list of videos and removes punctuation
+    '''
+    aggregate_text = ""
+    for yt_code in youtube_hashes:
+        print("Downloading:", yt_code)
         try:
-            fragments = YouTubeTranscriptApi.get_transcript(code)
-            for frag in fragments:
-                transcripts = transcripts + " " + frag['text']
-        except:
-            print("FAILED: " + code)
-    text_file = open(fp , "w")
-    text_file.write(transcripts)
-    text_file.close
+            current_video_transcript_text = ""
+            transcript_dicts = YouTubeTranscriptApi.get_transcript(yt_code)
+            for tdict in transcript_dicts:
+                text = remove_punctuation(tdict['text'])
+                current_video_transcript_text = current_video_transcript_text \
+                    + " " + text
+            aggregate_text = aggregate_text + current_video_transcript_text
+        except YouTubeTranscriptApi.CouldNotRetrieveTranscript as error:
+            print("WARNING: Failed to retrieve", error.video_id)
+    return aggregate_text
 
-transcripts = open(fp).read()
 
-translator = str.maketrans('', '', string.punctuation)
-transcripts = transcripts.translate(translator)
+def remove_punctuation(uncleansed_string):
+    '''
+    removes punctuation
+    '''
+    translator = str.maketrans('', '', string.punctuation)
+    cleansed_string = uncleansed_string.translate(translator)
+    return cleansed_string
 
-tokens = nltk.word_tokenize(transcripts)
 
-filter_these = ()
-tokens = [word.lower() for word in tokens if word.lower() not in filter_these]
+def profile_text(string_to_analyze):
+    '''
+    returns a tuple (bigrams, trigrams) fro the string_to_analyze passed in
+    '''
+    tokens = nltk.tokenize.toktok.ToktokTokenizer().tokenize(string_to_analyze)
+    bigram_measures = nltk.collocations.BigramAssocMeasures()
+    trigram_measures = nltk.collocations.TrigramAssocMeasures()
 
-bigram_measures = nltk.collocations.BigramAssocMeasures()
-trigram_measures = nltk.collocations.TrigramAssocMeasures()
+    # change this to read in your data
+    trigram_finder = nltk.collocations.TrigramCollocationFinder.from_words(tokens)
+    bigram_finder = nltk.collocations.BigramCollocationFinder.from_words(tokens)
 
-# change this to read in your data
-finder = TrigramCollocationFinder.from_words(tokens)
-# finder = BigramCollocationFinder.from_words(tokens)
+    # only n-grams that appear 3+ times
+    trigram_finder.apply_freq_filter(3)
+    bigram_finder.apply_freq_filter(3)
 
-# only bigrams that appear 3+ times
-finder.apply_freq_filter(3) 
+    # return the 10 n-grams with the highest PMI
+    bigrams = bigram_finder.nbest(bigram_measures.pmi, 100)
+    trigrams = trigram_finder.nbest(trigram_measures.pmi, 100)
 
-# return the 10 n-grams with the highest PMI
-print(finder.nbest(bigram_measures.pmi, 100))
+    return (bigrams, trigrams)
 
+
+def pretty_print_ngrams(ngrams):
+    text = "\n".join([" ".join(word) for word in ngrams])
+    print(text)
+
+
+def main():
+    '''
+    prints the bigrams and trigrams for the youtube codes passed in
+    '''
+    youtube_codes = sys.argv[1:]
+
+    file_path = youtube_codes[0] + ".txt"
+    string_to_analyze = ""
+    if not os.path.isfile(file_path):
+        string_to_analyze = get_transcript_text(youtube_codes)
+        text_file = open(file_path, "w")
+        text_file.write(string_to_analyze)
+        text_file.close()
+    else:
+        string_to_analyze = open(file_path).read()
+
+    bigrams, trigrams = profile_text(string_to_analyze)
+    print("Bigrams:\n")
+    pretty_print_ngrams(bigrams)
+    print("\n")
+    print("Trigrams:\n")
+    pretty_print_ngrams(trigrams)
+
+
+if __name__ == "__name__":
+    print("boom")
+    main()
+
+main()
